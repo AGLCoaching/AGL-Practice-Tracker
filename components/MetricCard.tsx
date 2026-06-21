@@ -61,8 +61,8 @@ export default function MetricCard({ metric, clientId }: MetricCardProps) {
               />
               <Tooltip
                 contentStyle={{ fontSize: 12, border: '1px solid #E2E8F0', borderRadius: 8 }}
-                formatter={(val: number) => [
-                  metric.response_type === 'yesno' ? (val ? 'Yes' : 'No') : val,
+                formatter={(val) => [
+                  metric.response_type === 'yesno' ? (Number(val) ? 'Yes' : 'No') : val,
                   metric.unit_label
                 ]}
               />
