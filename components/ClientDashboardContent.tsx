@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
@@ -49,6 +50,7 @@ export default function ClientDashboardContent({ client, coach, metrics, token }
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const supabase = createClient()
+  const router = useRouter()
 
   async function handleLog(metric: Metric) {
     const raw = values[metric.id]
@@ -81,6 +83,7 @@ export default function ClientDashboardContent({ client, coach, metrics, token }
       setErrors(e => ({ ...e, [metric.id]: 'Could not save. Please try again.' }))
     } else {
       setSubmitted(s => ({ ...s, [metric.id]: true }))
+      router.refresh()
     }
   }
 
