@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ToggleClientStatus from '@/components/ToggleClientStatus'
 import MetricCard from '@/components/MetricCard'
+import CopyLinkButton from '@/components/CopyLinkButton'
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -71,13 +72,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--blue)' }}>{dashboardUrl}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => navigator.clipboard.writeText(dashboardUrl)}
-            className="text-xs px-3 py-1.5 rounded border font-medium"
-            style={{ color: 'var(--blue)', borderColor: 'var(--blue)' }}
-          >
-            Copy Link
-          </button>
+          <CopyLinkButton url={dashboardUrl} />
         </div>
       </div>
 
