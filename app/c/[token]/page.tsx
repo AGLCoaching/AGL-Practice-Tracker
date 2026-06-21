@@ -30,7 +30,7 @@ export default async function ClientDashboardPage({ params }: { params: Promise<
 
   return (
     <ClientDashboardContent
-      client={{ first_name: client.first_name }}
+      client={{ id: client.id, first_name: client.first_name }}
       coach={coach}
       metrics={metrics || []}
       token={token}

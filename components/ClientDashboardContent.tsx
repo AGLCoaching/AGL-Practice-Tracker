@@ -32,6 +32,7 @@ interface Coach {
 }
 
 interface Client {
+  id: string
   first_name: string
 }
 
@@ -69,6 +70,7 @@ export default function ClientDashboardContent({ client, coach, metrics, token }
 
     const { error } = await supabase.from('practice_logs').insert({
       metric_id: metric.id,
+      client_id: client.id,
       logged_value: loggedValue,
       logged_at: new Date().toISOString(),
     })
