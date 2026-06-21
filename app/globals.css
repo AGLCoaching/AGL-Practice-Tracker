@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  --navy: #1F3864;
+  --blue: #2E75B6;
+  --text: #404040;
+  --bg: #F8F9FB;
+  --white: #FFFFFF;
+  --border: #E2E8F0;
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger: #DC2626;
+  --muted: #6B7280;
+}
+
+body {
+  color: var(--text);
+  background: var(--bg);
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+h1, h2, h3, h4 {
+  color: var(--navy);
+  font-weight: 700;
+}
