@@ -1,6 +1,8 @@
 'use client'
+import { useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from 'recharts'
 import { format, parseISO } from 'date-fns'
+import { createClient } from '@/lib/supabase/client'
 
 interface Log {
   logged_value: number
@@ -11,6 +13,7 @@ interface Metric {
   id: string
   name: string
   unit_label: string
+  prompt_text: string
   response_type: string
   start_date: string
   end_date: string
@@ -36,9 +39,49 @@ interface Props {
   client: Client
   coach: Coach
   metrics: Metric[]
+  token: string
 }
 
-export default function ClientDashboardContent({ client, coach, metrics }: Props) {
+export default function ClientDashboardContent({ client, coach, metrics, token }: Props) {
+  const [submitted, setSubmitted] = useState<Record<string, boolean>>({})
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const supabase = createClient()
+
+  async function handleLog(metric: Metric) {
+    const raw = values[metric.id]
+    let loggedValue: number
+
+    if (metric.response_type === 'yesno') {
+      loggedValue = raw === 'yes' ? 1 : 0
+    } else {
+      const n = parseFloat(raw)
+      if (isNaN(n)) {
+        setErrors(e => ({ ...e, [metric.id]: 'Please enter a number.' }))
+        return
+      }
+      loggedValue = n
+    }
+
+    setSaving(s => ({ ...s, [metric.id]: true }))
+    setErrors(e => ({ ...e, [metric.id]: '' }))
+
+    const { error } = await supabase.from('practice_logs').insert({
+      metric_id: metric.id,
+      logged_value: loggedValue,
+      logged_at: new Date().toISOString(),
+    })
+
+    setSaving(s => ({ ...s, [metric.id]: false }))
+
+    if (error) {
+      setErrors(e => ({ ...e, [metric.id]: 'Could not save. Please try again.' }))
+    } else {
+      setSubmitted(s => ({ ...s, [metric.id]: true }))
+    }
+  }
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
       {/* Header */}
@@ -76,6 +119,7 @@ export default function ClientDashboardContent({ client, coach, metrics }: Props
                 ? (logs.reduce((s, l) => s + l.logged_value, 0) / logs.length).toFixed(1)
                 : null
               const best = logs.length ? Math.max(...logs.map((l) => l.logged_value)) : null
+              const isSubmitted = submitted[metric.id]
 
               return (
                 <div key={metric.id} className="bg-white rounded-xl border p-6" style={{ borderColor: 'var(--border)' }}>
@@ -84,6 +128,65 @@ export default function ClientDashboardContent({ client, coach, metrics }: Props
                     {metric.unit_label} · {format(parseISO(metric.start_date), 'MMM d')} – {format(parseISO(metric.end_date), 'MMM d, yyyy')}
                   </p>
 
+                  {/* Log entry */}
+                  <div className="rounded-lg p-4 mb-4" style={{ background: '#F0F5FB', border: '1px solid #C7DCF0' }}>
+                    {isSubmitted ? (
+                      <p className="text-sm font-medium text-center py-1" style={{ color: '#1F3864' }}>
+                        Logged. Thank you!
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium mb-3" style={{ color: 'var(--navy)' }}>
+                          {metric.prompt_text
+                            ? `${metric.prompt_text} — Reply with ${metric.response_type === 'yesno' ? 'Yes or No' : 'a number'}.`
+                            : `Log today's ${metric.name}`}
+                        </p>
+
+                        {metric.response_type === 'yesno' ? (
+                          <div className="flex gap-3">
+                            {['yes', 'no'].map((opt) => (
+                              <button
+                                key={opt}
+                                onClick={() => setValues(v => ({ ...v, [metric.id]: opt }))}
+                                className="flex-1 py-2 rounded-lg text-sm font-medium border transition-colors"
+                                style={{
+                                  background: values[metric.id] === opt ? 'var(--blue)' : 'white',
+                                  color: values[metric.id] === opt ? 'white' : 'var(--text)',
+                                  borderColor: values[metric.id] === opt ? 'var(--blue)' : 'var(--border)',
+                                }}
+                              >
+                                {opt === 'yes' ? 'Yes' : 'No'}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            value={values[metric.id] || ''}
+                            onChange={e => setValues(v => ({ ...v, [metric.id]: e.target.value }))}
+                            placeholder="Enter a number"
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 mb-1"
+                            style={{ borderColor: 'var(--border)' }}
+                          />
+                        )}
+
+                        {errors[metric.id] && (
+                          <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>{errors[metric.id]}</p>
+                        )}
+
+                        <button
+                          onClick={() => handleLog(metric)}
+                          disabled={saving[metric.id] || (metric.response_type !== 'yesno' && !values[metric.id]) || (metric.response_type === 'yesno' && !values[metric.id])}
+                          className="mt-3 w-full py-2 rounded-lg text-white text-sm font-medium transition-opacity disabled:opacity-50"
+                          style={{ background: 'var(--blue)' }}
+                        >
+                          {saving[metric.id] ? 'Saving...' : 'Submit'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Chart */}
                   {chartData.length > 0 ? (
                     <div className="h-52">
                       <ResponsiveContainer width="100%" height="100%">
@@ -123,8 +226,8 @@ export default function ClientDashboardContent({ client, coach, metrics }: Props
                       </ResponsiveContainer>
                     </div>
                   ) : (
-                    <div className="h-36 flex items-center justify-center rounded-lg" style={{ background: '#F9FAFB' }}>
-                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Waiting for your first response</p>
+                    <div className="h-24 flex items-center justify-center rounded-lg" style={{ background: '#F9FAFB' }}>
+                      <p className="text-sm" style={{ color: 'var(--muted)' }}>No entries yet</p>
                     </div>
                   )}
 
