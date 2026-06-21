@@ -265,12 +265,11 @@ export default function MetricWizard({ clientId, clientPreferredContact, clientT
             </Field>
             <Field label="Delivery Method">
               <div className="flex gap-4 mt-1">
-                {[['sms', '📱 SMS'], ['email', '📧 Email']] as const}
-                {([['sms', '📱 SMS'], ['email', '📧 Email']] as [string, string][]).map(([val, label]) => (
+                {(['sms', 'email'] as const).map((val) => (
                   <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
                     <input type="radio" name="deliveryMethod" value={val} checked={deliveryMethod === val}
-                      onChange={() => setDeliveryMethod(val as 'sms' | 'email')} />
-                    {label}
+                      onChange={() => setDeliveryMethod(val)} />
+                    {val === 'sms' ? 'SMS' : 'Email'}
                   </label>
                 ))}
               </div>
