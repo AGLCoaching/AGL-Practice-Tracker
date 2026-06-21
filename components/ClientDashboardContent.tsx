@@ -44,6 +44,11 @@ interface Props {
   token: string
 }
 
+function isLoggedToday(logs: Log[]): boolean {
+  const today = new Date().toISOString().slice(0, 10)
+  return logs.some(l => l.logged_at.slice(0, 10) === today)
+}
+
 export default function ClientDashboardContent({ client, coach, metrics, token }: Props) {
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({})
   const [values, setValues] = useState<Record<string, string>>({})
@@ -124,7 +129,7 @@ export default function ClientDashboardContent({ client, coach, metrics, token }
                 ? (logs.reduce((s, l) => s + l.logged_value, 0) / logs.length).toFixed(1)
                 : null
               const best = logs.length ? Math.max(...logs.map((l) => l.logged_value)) : null
-              const isSubmitted = submitted[metric.id]
+              const alreadyLoggedToday = isLoggedToday(logs) || submitted[metric.id]
 
               return (
                 <div key={metric.id} className="bg-white rounded-xl border p-6" style={{ borderColor: 'var(--border)' }}>
@@ -135,9 +140,11 @@ export default function ClientDashboardContent({ client, coach, metrics, token }
 
                   {/* Log entry */}
                   <div className="rounded-lg p-4 mb-4" style={{ background: '#F0F5FB', border: '1px solid #C7DCF0' }}>
-                    {isSubmitted ? (
+                    {alreadyLoggedToday ? (
                       <p className="text-sm font-medium text-center py-1" style={{ color: '#1F3864' }}>
-                        Logged. Thank you!
+                        {submitted[metric.id]
+                          ? "Logged. Remember: it's about making progress, not perfection. Keep it going!"
+                          : "You've already logged today. See you tomorrow!"}
                       </p>
                     ) : (
                       <>
