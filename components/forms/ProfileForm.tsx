@@ -27,7 +27,6 @@ export default function ProfileForm({ profile }: { profile: AppUser }) {
   const [lastName, setLastName] = useState(profile.last_name)
   const [phone, setPhone] = useState(profile.phone || '')
   const [timezone, setTimezone] = useState(profile.timezone || 'America/Chicago')
-  const [bio, setBio] = useState(profile.bio || '')
   const [photoUrl, setPhotoUrl] = useState(profile.photo_url || '')
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -89,7 +88,6 @@ export default function ProfileForm({ profile }: { profile: AppUser }) {
         last_name: lastName.trim(),
         phone: phone.trim() || null,
         timezone,
-        bio: bio.trim() || null,
       })
       .eq('id', profile.id)
 
@@ -222,27 +220,6 @@ export default function ProfileForm({ profile }: { profile: AppUser }) {
             </select>
           </div>
         </div>
-      </div>
-
-      {/* Bio */}
-      <div className="bg-white rounded-xl border p-6" style={{ borderColor: 'var(--border)' }}>
-        <h2 className="text-sm font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--muted)' }}>
-          Bio
-        </h2>
-        <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
-          Used in client-facing materials and coach directory. Keep it concise.
-        </p>
-        <textarea
-          value={bio}
-          onChange={e => setBio(e.target.value)}
-          rows={4}
-          placeholder="A brief professional bio — credentials, focus areas, coaching philosophy..."
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 resize-none"
-          style={{ borderColor: 'var(--border)' }}
-        />
-        <p className="text-xs mt-1 text-right" style={{ color: 'var(--muted)' }}>
-          {bio.length} / 500 characters
-        </p>
       </div>
 
       {/* Actions */}

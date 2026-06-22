@@ -1,15 +1,13 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { TIMEZONES } from '@/lib/utils'
 
 export default function InviteCoachForm() {
   const router = useRouter()
-  const supabase = createClient()
   const [form, setForm] = useState({
     first_name: '', last_name: '', email: '',
-    company_name: '', phone: '', timezone: 'America/New_York',
+    company_name: '', phone: '', timezone: 'America/Chicago',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -24,33 +22,36 @@ export default function InviteCoachForm() {
     setSaving(true)
     setError('')
 
-    // Create the user profile row first (auth invite handled separately)
-    const { error: err } = await supabase.from('users').insert({
-      email: form.email,
-      first_name: form.first_name,
-      last_name: form.last_name,
-      company_name: form.company_name || null,
-      phone: form.phone || null,
-      timezone: form.timezone,
-      role: 'coach',
-      is_active: true,
-      invited_at: new Date().toISOString(),
+    const res = await fetch('/api/admin/invite-coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
     })
 
-    if (err) { setError(err.message); setSaving(false); return }
-    setSuccess(true)
+    const data = await res.json()
     setSaving(false)
+
+    if (!res.ok) {
+      setError(data.error || 'Something went wrong. Please try again.')
+      return
+    }
+
+    setSuccess(true)
   }
 
   if (success) {
     return (
       <div className="bg-white rounded-xl border p-8 text-center" style={{ borderColor: 'var(--border)' }}>
         <div className="text-4xl mb-3">✅</div>
-        <h3 className="font-semibold mb-1" style={{ color: 'var(--navy)' }}>Coach profile created</h3>
+        <h3 className="font-semibold mb-1" style={{ color: 'var(--navy)' }}>Invite sent</h3>
         <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
-          {form.first_name} {form.last_name} has been added. Use Supabase to send them an invite email to set their password.
+          {form.first_name} {form.last_name} will receive an email to set their password and access their dashboard.
         </p>
-        <button onClick={() => router.push('/admin')} className="px-4 py-2 rounded-lg text-white text-sm font-medium" style={{ background: 'var(--blue)' }}>
+        <button
+          onClick={() => router.push('/admin')}
+          className="px-4 py-2 rounded-lg text-white text-sm font-medium"
+          style={{ background: 'var(--blue)' }}
+        >
           Back to Coaches
         </button>
       </div>
@@ -70,11 +71,11 @@ export default function InviteCoachForm() {
       <Field label="Email Address" required>
         <input type="email" value={form.email} onChange={e => set('email', e.target.value)} required className={inp} placeholder="coach@theircompany.com" />
       </Field>
-      <Field label="Company Name" hint="Optional — shown on client dashboards">
+      <Field label="Company / Firm Name" hint="Optional">
         <input type="text" value={form.company_name} onChange={e => set('company_name', e.target.value)} className={inp} />
       </Field>
       <Field label="Phone" hint="Optional">
-        <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} className={inp} />
+        <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} className={inp} placeholder="+1 (555) 000-0000" />
       </Field>
       <Field label="Time Zone" required>
         <select value={form.timezone} onChange={e => set('timezone', e.target.value)} required className={inp}>
@@ -83,10 +84,20 @@ export default function InviteCoachForm() {
       </Field>
       {error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
       <div className="flex gap-3 pt-2">
-        <button type="submit" disabled={saving} className="px-5 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60" style={{ background: 'var(--blue)' }}>
-          {saving ? 'Adding...' : 'Add Coach'}
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-5 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60"
+          style={{ background: 'var(--blue)' }}
+        >
+          {saving ? 'Sending invite...' : 'Send Invite'}
         </button>
-        <button type="button" onClick={() => router.back()} className="px-5 py-2 rounded-lg text-sm border" style={{ color: 'var(--text)', borderColor: 'var(--border)' }}>
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="px-5 py-2 rounded-lg text-sm border"
+          style={{ color: 'var(--text)', borderColor: 'var(--border)' }}
+        >
           Cancel
         </button>
       </div>
@@ -95,6 +106,7 @@ export default function InviteCoachForm() {
 }
 
 const inp = "w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+
 function Field({ label, children, required, hint }: { label: string; children: React.ReactNode; required?: boolean; hint?: string }) {
   return (
     <div>
