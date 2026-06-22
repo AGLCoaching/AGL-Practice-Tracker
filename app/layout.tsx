@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'AGL Practice Tracker',
-  description: 'AGL Coaching Practice Tracking Tool',
+  title: 'AGL Habit Builder',
+  description: 'AGL Coaching Habit Builder',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

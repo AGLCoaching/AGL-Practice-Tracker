@@ -26,7 +26,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
       <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border p-8" style={{ borderColor: 'var(--border)' }}>
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--navy)' }}>AGL Practice Tracker</h1>
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--navy)' }}>AGL Habit Builder</h1>
           <p style={{ color: 'var(--muted)', fontSize: 13 }}>Sign in to your account</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">

@@ -4,6 +4,23 @@ import Link from 'next/link'
 import ToggleClientStatus from '@/components/ToggleClientStatus'
 import MetricCard from '@/components/MetricCard'
 import CopyLinkButton from '@/components/CopyLinkButton'
+import EncouragementBox from '@/components/EncouragementBox'
+
+function formatTimezone(tz: string): string {
+  if (!tz) return '—'
+  try {
+    const city = tz.split('/').pop()?.replace(/_/g, ' ') || tz
+    const now = new Date()
+    const abbr = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
+      .formatToParts(now).find(p => p.type === 'timeZoneName')?.value || ''
+    const offsetStr = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'longOffset' })
+      .formatToParts(now).find(p => p.type === 'timeZoneName')?.value || ''
+    const utc = offsetStr.replace('GMT', 'UTC').replace(':00', '')
+    return `${city} (${utc}) ${abbr}`
+  } catch {
+    return tz
+  }
+}
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -47,6 +64,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </div>
         <div className="flex items-center gap-2">
           <ToggleClientStatus clientId={client.id} isActive={client.is_active} />
+          <CopyLinkButton url={dashboardUrl} label="Copy Client Link" />
           <Link
             href={`/clients/${id}/edit`}
             className="px-3 py-2 rounded-lg text-sm font-medium border"
@@ -61,50 +79,42 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       <div className="bg-white rounded-xl border p-5 mb-6 grid grid-cols-4 gap-4" style={{ borderColor: 'var(--border)' }}>
         <InfoItem label="Email" value={client.email} />
         <InfoItem label="Phone" value={client.phone || '—'} />
-        <InfoItem label="Time Zone" value={client.timezone?.replace('America/', '').replace('_', ' ') || '—'} />
-        <InfoItem label="Contact Method" value={client.preferred_contact === 'sms' ? '📱 SMS' : '📧 Email'} />
+        <InfoItem label="Time Zone" value={formatTimezone(client.timezone)} />
+        <InfoItem label="Contact Method" value={client.preferred_contact === 'sms' ? 'SMS' : 'Email'} />
       </div>
 
-      {/* Dashboard link */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium" style={{ color: 'var(--navy)' }}>Client Dashboard Link</p>
-          <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--blue)' }}>{dashboardUrl}</p>
-        </div>
-        <div className="flex gap-2">
-          <CopyLinkButton url={dashboardUrl} />
-        </div>
-      </div>
-
-      {/* Active metrics */}
+      {/* Active habits */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--navy)' }}>Practice Metrics</h2>
+        <h2 className="text-lg font-bold" style={{ color: 'var(--navy)' }}>Habits</h2>
         <Link
           href={`/metrics/new?clientId=${id}`}
           className="px-4 py-2 rounded-lg text-white text-sm font-medium"
           style={{ background: 'var(--blue)' }}
         >
-          + Add Practice
+          + Add Habit
         </Link>
       </div>
 
       {activeMetrics.length > 0 ? (
-        <div className="space-y-4 mb-6">
+        <div className="space-y-6 mb-6">
           {activeMetrics.map((metric) => (
-            <MetricCard key={metric.id} metric={metric} clientId={id} />
+            <div key={metric.id}>
+              <MetricCard metric={metric} clientId={id} />
+              <EncouragementBox metricId={metric.id} clientId={id} metricName={metric.name} />
+            </div>
           ))}
         </div>
       ) : (
         <div className="bg-white rounded-xl border p-8 text-center mb-6" style={{ borderColor: 'var(--border)' }}>
           <div className="text-3xl mb-2">📊</div>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>No active practices. Add one to get started.</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>No active habits. Add one to get started.</p>
         </div>
       )}
 
       {/* Archived */}
       {archivedMetrics.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--muted)' }}>ARCHIVED PRACTICES</h3>
+          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--muted)' }}>ARCHIVED HABITS</h3>
           <div className="space-y-2">
             {archivedMetrics.map((metric) => (
               <div key={metric.id} className="bg-white rounded-lg border p-3 flex items-center justify-between" style={{ borderColor: 'var(--border)', opacity: 0.7 }}>

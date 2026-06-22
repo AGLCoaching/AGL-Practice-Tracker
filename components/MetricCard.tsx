@@ -1,5 +1,7 @@
 'use client'
 import Link from 'next/link'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
 
@@ -23,6 +25,10 @@ interface MetricCardProps {
 }
 
 export default function MetricCard({ metric, clientId }: MetricCardProps) {
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const router = useRouter()
+
   const logs = metric.logs || []
   const chartData = logs
     .sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime())
@@ -33,6 +39,18 @@ export default function MetricCard({ metric, clientId }: MetricCardProps) {
 
   const goalValue = metric.has_goal && metric.goal_start != null ? metric.goal_start : null
 
+  async function handleDelete() {
+    setDeleting(true)
+    const res = await fetch(`/api/metrics/${metric.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.refresh()
+    } else {
+      setDeleting(false)
+      setConfirming(false)
+      alert('Could not delete. Please try again.')
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl border p-5" style={{ borderColor: 'var(--border)' }}>
       <div className="flex items-start justify-between mb-4">
@@ -42,9 +60,41 @@ export default function MetricCard({ metric, clientId }: MetricCardProps) {
             {metric.unit_label} · {format(parseISO(metric.start_date), 'MMM d')} – {format(parseISO(metric.end_date), 'MMM d, yyyy')}
           </p>
         </div>
-        <Link href={`/metrics/${metric.id}`} className="text-xs font-medium" style={{ color: 'var(--blue)' }}>
-          Details →
-        </Link>
+        <div className="flex items-center gap-3">
+          {confirming ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>Delete?</span>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs font-medium px-2 py-1 rounded"
+                style={{ background: '#FEE2E2', color: '#DC2626' }}
+              >
+                {deleting ? '...' : 'Yes'}
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                className="text-xs font-medium px-2 py-1 rounded"
+                style={{ background: '#F3F4F6', color: 'var(--text)' }}
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setConfirming(true)}
+                className="text-xs font-medium"
+                style={{ color: '#DC2626' }}
+              >
+                Delete
+              </button>
+              <Link href={`/metrics/${metric.id}`} className="text-xs font-medium" style={{ color: 'var(--blue)' }}>
+                Details →
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       {chartData.length > 0 ? (

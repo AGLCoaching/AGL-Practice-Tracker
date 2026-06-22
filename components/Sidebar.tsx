@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import type { AppUser } from '@/lib/types'
 
@@ -22,9 +23,9 @@ export default function Sidebar({ user }: SidebarProps) {
   return (
     <aside className="w-56 min-h-screen flex flex-col border-r" style={{ background: 'var(--navy)', borderColor: '#2a4a7f' }}>
       {/* Logo area */}
-      <div className="px-5 py-5 border-b" style={{ borderColor: '#2a4a7f' }}>
-        <div className="text-white font-bold text-base leading-tight">AGL Practice</div>
-        <div className="text-xs mt-0.5" style={{ color: '#93b4d4' }}>Tracker</div>
+      <div className="px-4 py-3 border-b" style={{ background: 'white', borderColor: '#e5e7eb' }}>
+        <Image src="/agl-logo.png" alt="AGL Coaching" width={160} height={72} style={{ width: '100%', height: 'auto' }} priority />
+        <div className="text-xs mt-1.5 font-medium text-center" style={{ color: '#1F3864' }}>Habit Builder</div>
       </div>
 
       {/* Nav */}

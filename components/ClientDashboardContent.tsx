@@ -104,7 +104,7 @@ export default function ClientDashboardContent({ client, coach, metrics, token }
             <div className="font-bold text-base" style={{ color: 'var(--navy)' }}>
               {coach.company_name || `${coach.first_name} ${coach.last_name}`}
             </div>
-            <div className="text-xs" style={{ color: 'var(--muted)' }}>Practice Tracking</div>
+            <div className="text-xs" style={{ color: 'var(--muted)' }}>Habit Builder</div>
           </div>
         </div>
       </header>
