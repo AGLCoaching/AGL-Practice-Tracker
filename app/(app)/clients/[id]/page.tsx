@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ToggleClientStatus from '@/components/ToggleClientStatus'
 import MetricCard from '@/components/MetricCard'
-import CopyLinkButton from '@/components/CopyLinkButton'
 import EncouragementBox from '@/components/EncouragementBox'
 
 function formatTimezone(tz: string): string {
@@ -20,6 +19,21 @@ function formatTimezone(tz: string): string {
   } catch {
     return tz
   }
+}
+
+function formatPhone(phone: string | null): string {
+  if (!phone) return '—'
+  const digits = phone.replace(/\D/g, '')
+  // US/Canada: +1 (832) 270-2630
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
+  }
+  if (digits.length === 10) {
+    return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+  // International: keep + prefix if present, otherwise return cleaned
+  if (phone.startsWith('+')) return phone
+  return phone
 }
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -64,7 +78,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </div>
         <div className="flex items-center gap-2">
           <ToggleClientStatus clientId={client.id} isActive={client.is_active} />
-          <CopyLinkButton url={dashboardUrl} label="Copy Client Link" />
           <Link
             href={`/clients/${id}/edit`}
             className="px-3 py-2 rounded-lg text-sm font-medium border"
@@ -78,20 +91,20 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       {/* Info bar */}
       <div className="bg-white rounded-xl border p-5 mb-6 grid grid-cols-4 gap-4" style={{ borderColor: 'var(--border)' }}>
         <InfoItem label="Email" value={client.email} />
-        <InfoItem label="Phone" value={client.phone || '—'} />
+        <InfoItem label="Phone" value={formatPhone(client.phone)} />
         <InfoItem label="Time Zone" value={formatTimezone(client.timezone)} />
         <InfoItem label="Contact Method" value={client.preferred_contact === 'sms' ? 'SMS' : 'Email'} />
       </div>
 
-      {/* Active habits */}
+      {/* Active practices */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--navy)' }}>Habits</h2>
+        <h2 className="text-lg font-bold" style={{ color: 'var(--navy)' }}>Practice</h2>
         <Link
           href={`/metrics/new?clientId=${id}`}
           className="px-4 py-2 rounded-lg text-white text-sm font-medium"
           style={{ background: 'var(--blue)' }}
         >
-          + Add Habit
+          + Add Practice
         </Link>
       </div>
 
@@ -99,22 +112,22 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="space-y-6 mb-6">
           {activeMetrics.map((metric) => (
             <div key={metric.id}>
-              <MetricCard metric={metric} clientId={id} />
-              <EncouragementBox metricId={metric.id} clientId={id} metricName={metric.name} />
+              <MetricCard metric={metric} clientId={id} dashboardUrl={dashboardUrl} />
+              <EncouragementBox metricId={metric.id} clientId={id} clientFirstName={client.first_name} />
             </div>
           ))}
         </div>
       ) : (
         <div className="bg-white rounded-xl border p-8 text-center mb-6" style={{ borderColor: 'var(--border)' }}>
           <div className="text-3xl mb-2">📊</div>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>No active habits. Add one to get started.</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>No active practices. Add one to get started.</p>
         </div>
       )}
 
       {/* Archived */}
       {archivedMetrics.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--muted)' }}>ARCHIVED HABITS</h3>
+          <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--muted)' }}>ARCHIVED PRACTICES</h3>
           <div className="space-y-2">
             {archivedMetrics.map((metric) => (
               <div key={metric.id} className="bg-white rounded-lg border p-3 flex items-center justify-between" style={{ borderColor: 'var(--border)', opacity: 0.7 }}>

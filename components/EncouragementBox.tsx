@@ -13,10 +13,10 @@ interface Message {
 interface Props {
   metricId: string
   clientId: string
-  metricName: string
+  clientFirstName: string
 }
 
-export default function EncouragementBox({ metricId, clientId, metricName }: Props) {
+export default function EncouragementBox({ metricId, clientId, clientFirstName }: Props) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -62,7 +62,7 @@ export default function EncouragementBox({ metricId, clientId, metricName }: Pro
   return (
     <div className="bg-white rounded-b-xl border border-t-0 px-5 pb-5 pt-4" style={{ borderColor: 'var(--border)' }}>
       <p className="text-sm font-medium mb-2" style={{ color: 'var(--navy)' }}>
-        Send {metricName.split(' ')[0]} an encouraging message
+        Send {clientFirstName} an encouraging message
       </p>
       <textarea
         value={message}

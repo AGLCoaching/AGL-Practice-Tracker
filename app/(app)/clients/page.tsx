@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import type { Client, AppUser } from '@/lib/types'
+import type { Client } from '@/lib/types'
 
 export default async function ClientsPage({
   searchParams,
@@ -15,30 +16,49 @@ export default async function ClientsPage({
   const { data: profile } = await supabase
     .from('users').select('*').eq('id', user!.id).single()
 
-  // Build query — admin sees all, coach sees only theirs
-  let query = supabase
-    .from('clients')
-    .select('*, metrics:practice_metrics(id, is_active)')
-    .order('last_name')
+  const isAdmin = profile?.role === 'admin'
 
-  if (profile?.role !== 'admin') {
-    query = query.eq('coach_id', user!.id)
+  type ClientRow = Client & {
+    metrics?: { id: string; is_active: boolean }[]
+    coach?: { first_name: string; last_name: string } | null
   }
 
-  if (filter === 'active') query = query.eq('is_active', true)
-  if (filter === 'inactive') query = query.eq('is_active', false)
+  let clients: ClientRow[] = []
 
-  const { data: clients } = await query
+  if (isAdmin) {
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    let query = admin
+      .from('clients')
+      .select('*, metrics:practice_metrics(id, is_active), coach:coach_id(first_name, last_name)')
+      .order('last_name')
+    if (filter === 'active') query = query.eq('is_active', true)
+    if (filter === 'inactive') query = query.eq('is_active', false)
+    const { data } = await query
+    clients = (data || []) as ClientRow[]
+  } else {
+    let query = supabase
+      .from('clients')
+      .select('*, metrics:practice_metrics(id, is_active)')
+      .eq('coach_id', user!.id)
+      .order('last_name')
+    if (filter === 'active') query = query.eq('is_active', true)
+    if (filter === 'inactive') query = query.eq('is_active', false)
+    const { data } = await query
+    clients = (data || []) as ClientRow[]
+  }
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--navy)' }}>
-            {profile?.role === 'admin' ? 'All Clients' : 'My Clients'}
+            {isAdmin ? 'All Clients' : 'My Clients'}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--muted)' }}>
-            {clients?.length || 0} {filter} client{clients?.length !== 1 ? 's' : ''}
+            {clients.length} {filter} client{clients.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Link
@@ -56,12 +76,8 @@ export default async function ClientsPage({
           <Link
             key={f}
             href={`/clients?filter=${f}`}
-            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-              filter === f
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent hover:text-gray-700'
-            }`}
-            style={filter === f ? { borderColor: 'var(--blue)', color: 'var(--blue)' } : { color: 'var(--muted)' }}
+            className="px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors"
+            style={filter === f ? { borderColor: 'var(--blue)', color: 'var(--blue)' } : { borderColor: 'transparent', color: 'var(--muted)' }}
           >
             {f}
           </Link>
@@ -69,13 +85,14 @@ export default async function ClientsPage({
       </div>
 
       {/* Client table */}
-      {clients && clients.length > 0 ? (
+      {clients.length > 0 ? (
         <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
           <table className="w-full">
             <thead>
               <tr className="border-b text-xs font-semibold uppercase tracking-wide" style={{ borderColor: 'var(--border)', color: 'var(--muted)', background: '#F9FAFB' }}>
                 <th className="px-5 py-3 text-left">Name</th>
                 <th className="px-5 py-3 text-left">Company</th>
+                {isAdmin && <th className="px-5 py-3 text-left">Coach</th>}
                 <th className="px-5 py-3 text-left">Contact</th>
                 <th className="px-5 py-3 text-left">Active Practices</th>
                 <th className="px-5 py-3 text-left">Status</th>
@@ -83,19 +100,30 @@ export default async function ClientsPage({
               </tr>
             </thead>
             <tbody>
-              {clients.map((client: Client & { metrics?: { id: string; is_active: boolean }[] }) => {
+              {clients.map((client) => {
                 const activeMetrics = client.metrics?.filter(m => m.is_active).length || 0
                 return (
                   <tr key={client.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors" style={{ borderColor: 'var(--border)' }}>
                     <td className="px-5 py-4">
-                      <div className="font-medium text-sm" style={{ color: 'var(--navy)' }}>
+                      <Link
+                        href={`/clients/${client.id}`}
+                        className="block font-medium text-sm hover:underline"
+                        style={{ color: 'var(--blue)' }}
+                      >
                         {client.first_name} {client.last_name}
-                      </div>
+                      </Link>
                       <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{client.email}</div>
                     </td>
                     <td className="px-5 py-4 text-sm" style={{ color: 'var(--text)' }}>
                       {client.company_name || <span style={{ color: 'var(--muted)' }}>—</span>}
                     </td>
+                    {isAdmin && (
+                      <td className="px-5 py-4 text-sm" style={{ color: 'var(--text)' }}>
+                        {client.coach
+                          ? `${client.coach.first_name} ${client.coach.last_name}`
+                          : <span style={{ color: 'var(--muted)' }}>—</span>}
+                      </td>
+                    )}
                     <td className="px-5 py-4 text-sm" style={{ color: 'var(--text)' }}>
                       {client.preferred_contact === 'sms' ? '📱 SMS' : '📧 Email'}
                     </td>
