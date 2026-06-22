@@ -77,23 +77,25 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           )}
         </div>
         <div className="flex items-center gap-2">
-          <ToggleClientStatus clientId={client.id} isActive={client.is_active} />
-          <Link
-            href={`/clients/${id}/edit`}
-            className="px-3 py-2 rounded-lg text-sm font-medium border"
-            style={{ color: 'var(--text)', borderColor: 'var(--border)' }}
-          >
-            Edit
-          </Link>
+          <ToggleClientStatus clientId={client.id} isActive={client.is_active} clientFirstName={client.first_name} />
         </div>
       </div>
 
       {/* Info bar */}
-      <div className="bg-white rounded-xl border p-5 mb-6 grid grid-cols-4 gap-4" style={{ borderColor: 'var(--border)' }}>
-        <InfoItem label="Email" value={client.email} />
-        <InfoItem label="Phone" value={formatPhone(client.phone)} />
-        <InfoItem label="Time Zone" value={formatTimezone(client.timezone)} />
-        <InfoItem label="Contact Method" value={client.preferred_contact === 'sms' ? 'SMS' : 'Email'} />
+      <div className="bg-white rounded-xl border p-5 mb-6 flex items-start gap-6" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex-1 grid grid-cols-4 gap-4">
+          <InfoItem label="Email" value={client.email} />
+          <InfoItem label="Phone" value={formatPhone(client.phone)} />
+          <InfoItem label="Time Zone" value={formatTimezone(client.timezone)} />
+          <InfoItem label="Contact Method" value={client.preferred_contact === 'sms' ? 'SMS' : 'Email'} />
+        </div>
+        <Link
+          href={`/clients/${id}/edit`}
+          className="shrink-0 px-3 py-2 rounded-lg text-sm font-medium border"
+          style={{ color: 'var(--text)', borderColor: 'var(--border)' }}
+        >
+          Edit
+        </Link>
       </div>
 
       {/* Active practices */}

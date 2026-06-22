@@ -106,7 +106,7 @@ export default async function ClientsPage({
                   <tr key={client.id} className="border-b last:border-0 hover:bg-gray-50 transition-colors" style={{ borderColor: 'var(--border)' }}>
                     <td className="px-5 py-4">
                       <Link
-                        href={`/clients/${client.id}`}
+                        href={`/clients/${client.id}/edit`}
                         className="block font-medium text-sm hover:underline"
                         style={{ color: 'var(--blue)' }}
                       >
