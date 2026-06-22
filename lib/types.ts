@@ -13,6 +13,8 @@ export interface AppUser {
   last_name: string
   company_name: string | null
   logo_url: string | null
+  photo_url: string | null
+  bio: string | null
   phone: string | null
   timezone: string
   role: UserRole

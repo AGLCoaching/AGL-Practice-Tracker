@@ -13,6 +13,7 @@ export default function Sidebar({ user }: SidebarProps) {
 
   const navItems = [
     { href: '/clients', label: 'My Clients', icon: '👥' },
+    { href: '/profile', label: 'My Profile', icon: '👤' },
     ...(user.role === 'admin' ? [
       { href: '/admin', label: 'Manage Coaches', icon: '⚙️' },
     ] : []),
@@ -48,9 +49,30 @@ export default function Sidebar({ user }: SidebarProps) {
 
       {/* User + sign out */}
       <div className="px-4 py-4 border-t" style={{ borderColor: '#2a4a7f' }}>
-        <div className="text-xs mb-1" style={{ color: '#93b4d4' }}>Signed in as</div>
-        <div className="text-sm text-white font-medium truncate">{user.first_name} {user.last_name}</div>
-        <div className="text-xs mt-0.5 mb-3 truncate" style={{ color: '#93b4d4' }}>{user.email}</div>
+        <Link href="/profile" className="flex items-center gap-3 mb-3 group">
+          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 flex items-center justify-center" style={{ background: '#2a4a7f' }}>
+            {user.photo_url ? (
+              <Image
+                src={user.photo_url}
+                alt={user.first_name}
+                width={32}
+                height={32}
+                className="w-full h-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <span className="text-xs text-white font-semibold">
+                {user.first_name[0]}{user.last_name[0]}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm text-white font-medium truncate group-hover:underline">
+              {user.first_name} {user.last_name}
+            </div>
+            <div className="text-xs truncate" style={{ color: '#93b4d4' }}>{user.email}</div>
+          </div>
+        </Link>
         <form action="/api/auth/signout" method="POST">
           <button
             type="submit"
