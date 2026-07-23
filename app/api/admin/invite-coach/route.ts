@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   // Send Supabase auth invite — resends if user is unconfirmed
   const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { first_name, last_name },
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=/reset-password`,
   })
 
   let userId: string
