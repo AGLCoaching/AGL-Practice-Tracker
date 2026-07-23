@@ -24,19 +24,31 @@ export async function POST(req: Request) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
-  // Send Supabase auth invite — creates auth.users entry and sends invite email
+  // Send Supabase auth invite — resends if user is unconfirmed
   const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { first_name, last_name },
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
   })
 
+  let userId: string
+
   if (inviteErr) {
-    return NextResponse.json({ error: inviteErr.message }, { status: 400 })
+    // User may already be confirmed — look them up by email
+    const { data: listData } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    const existingUser = listData?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    )
+    if (!existingUser) {
+      return NextResponse.json({ error: inviteErr.message }, { status: 400 })
+    }
+    userId = existingUser.id
+  } else {
+    userId = invited.user.id
   }
 
-  // Insert public.users profile with the auth user's ID
-  const { error: insertErr } = await admin.from('users').insert({
-    id: invited.user.id,
+  // Upsert public.users profile — handles both new invites and re-invites
+  const { error: upsertErr } = await admin.from('users').upsert({
+    id: userId,
     email,
     first_name,
     last_name,
@@ -46,12 +58,11 @@ export async function POST(req: Request) {
     role: 'coach',
     is_active: true,
     invited_at: new Date().toISOString(),
-  })
+  }, { onConflict: 'id' })
 
-  if (insertErr) {
-    // Auth user was created but profile insert failed — surface the error
-    return NextResponse.json({ error: insertErr.message }, { status: 500 })
+  if (upsertErr) {
+    return NextResponse.json({ error: upsertErr.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, userId: invited.user.id })
+  return NextResponse.json({ success: true, userId })
 }
