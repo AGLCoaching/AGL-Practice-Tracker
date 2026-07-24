@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
+import * as net from 'net'
+import * as tls from 'tls'
 
 // Runs every hour via Vercel Cron + cron-job.org
 // Checks for practice_metrics due this hour and sends SMS or email
@@ -39,18 +40,32 @@ async function sendSms(to: string, body: string): Promise<{ ok: boolean; error?:
   return { ok: false, error: text }
 }
 
-// ── Email ────────────────────────────────────────────────────────────────────
+// ── Email (built-in SMTP over STARTTLS — no npm packages) ───────────────────
 
-function getMailTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.EMAIL_PORT || '587'),
-    secure: false, // STARTTLS
-    auth: {
-      user: process.env.EMAIL_USER!,
-      pass: process.env.EMAIL_PASS!,
-    },
+/** Read one complete SMTP response (handles multi-line 250- continuations). Returns the 3-digit code. */
+function readSmtp(sock: net.Socket | tls.TLSSocket): Promise<number> {
+  return new Promise((resolve, reject) => {
+    let buf = ''
+    const timer = setTimeout(() => {
+      sock.removeListener('data', handler)
+      reject(new Error('SMTP read timeout'))
+    }, 10000)
+    const handler = (chunk: Buffer) => {
+      buf += chunk.toString()
+      // Final line of an SMTP response has a space after the 3-digit code, not a dash
+      const m = buf.match(/^(\d{3}) /m)
+      if (m) {
+        clearTimeout(timer)
+        sock.removeListener('data', handler)
+        resolve(parseInt(m[1]))
+      }
+    }
+    sock.on('data', handler)
   })
+}
+
+function smtpWrite(sock: net.Socket | tls.TLSSocket, line: string): void {
+  sock.write(line + '\r\n')
 }
 
 async function sendEmail(
@@ -59,19 +74,95 @@ async function sendEmail(
   text: string,
   html: string
 ): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const transporter = getMailTransporter()
-    await transporter.sendMail({
-      from: `"${process.env.EMAIL_FROM_NAME || 'AGL Habit Builder'}" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text,
-      html,
-    })
-    return { ok: true }
-  } catch (err: unknown) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+  const host = process.env.EMAIL_HOST || 'smtp.office365.com'
+  const port = parseInt(process.env.EMAIL_PORT || '587')
+  const user = process.env.EMAIL_USER
+  const pass = process.env.EMAIL_PASS
+  const fromName = process.env.EMAIL_FROM_NAME || 'AGL Habit Builder'
+
+  if (!user || !pass) return { ok: false, error: 'EMAIL_USER or EMAIL_PASS not configured' }
+
+  return new Promise((resolve) => {
+    let settled = false
+    const done = (result: { ok: boolean; error?: string }) => {
+      if (!settled) { settled = true; resolve(result) }
+    }
+
+    const socket = net.createConnection(port, host)
+    socket.setTimeout(20000)
+    socket.on('timeout', () => done({ ok: false, error: 'SMTP connection timeout' }))
+    socket.on('error', (e) => done({ ok: false, error: `Socket error: ${e.message}` }))
+
+    ;(async () => {
+      try {
+        await readSmtp(socket)                                                    // 220 greeting
+        smtpWrite(socket, 'EHLO agl-practice-tracker.vercel.app')
+        await readSmtp(socket)                                                    // 250
+
+        smtpWrite(socket, 'STARTTLS')
+        await readSmtp(socket)                                                    // 220 go ahead
+
+        // Upgrade to TLS
+        const secure = tls.connect({ socket, servername: host })
+        await new Promise<void>((res, rej) => {
+          secure.once('secureConnect', res)
+          secure.once('error', rej)
+        })
+
+        smtpWrite(secure, 'EHLO agl-practice-tracker.vercel.app')
+        await readSmtp(secure)                                                    // 250
+
+        smtpWrite(secure, 'AUTH LOGIN')
+        await readSmtp(secure)                                                    // 334 username?
+        smtpWrite(secure, Buffer.from(user).toString('base64'))
+        await readSmtp(secure)                                                    // 334 password?
+        smtpWrite(secure, Buffer.from(pass).toString('base64'))
+        const authCode = await readSmtp(secure)                                  // 235
+        if (authCode !== 235) throw new Error(`AUTH failed (code ${authCode})`)
+
+        smtpWrite(secure, `MAIL FROM:<${user}>`)
+        await readSmtp(secure)                                                    // 250
+        smtpWrite(secure, `RCPT TO:<${to}>`)
+        await readSmtp(secure)                                                    // 250
+
+        smtpWrite(secure, 'DATA')
+        await readSmtp(secure)                                                    // 354
+
+        const boundary = `----AGL${Date.now()}`
+        const message = [
+          `From: "${fromName}" <${user}>`,
+          `To: ${to}`,
+          `Subject: ${subject}`,
+          'MIME-Version: 1.0',
+          `Content-Type: multipart/alternative; boundary="${boundary}"`,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/plain; charset=UTF-8',
+          '',
+          text,
+          '',
+          `--${boundary}`,
+          'Content-Type: text/html; charset=UTF-8',
+          '',
+          html,
+          '',
+          `--${boundary}--`,
+          '.',
+        ].join('\r\n')
+
+        secure.write(message + '\r\n')
+        await readSmtp(secure)                                                    // 250 sent
+
+        smtpWrite(secure, 'QUIT')
+        secure.destroy()
+        socket.destroy()
+        done({ ok: true })
+      } catch (e) {
+        socket.destroy()
+        done({ ok: false, error: e instanceof Error ? e.message : String(e) })
+      }
+    })()
+  })
 }
 
 function buildEmailHtml(
