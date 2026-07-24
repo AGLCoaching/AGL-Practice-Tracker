@@ -37,9 +37,12 @@ async function sendSms(to: string, body: string): Promise<{ ok: boolean; error?:
 }
 
 export async function GET(req: Request) {
-  // Verify Vercel cron secret
+  // Verify secret — accepts Authorization header (Vercel cron) or ?secret= param (external cron)
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const urlSecret = new URL(req.url).searchParams.get('secret')
+  const isVercelCron = authHeader === `Bearer ${process.env.CRON_SECRET}`
+  const isExternalCron = urlSecret === process.env.CRON_SECRET
+  if (!isVercelCron && !isExternalCron) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
