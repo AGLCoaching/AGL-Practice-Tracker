@@ -91,8 +91,9 @@ export async function GET(req: Request) {
       hour12: false,
     }).formatToParts(now)
 
-    const currentHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0')
-    const currentDay = parts.find(p => p.type === 'weekday')?.value?.toLowerCase() || ''
+    const currentHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0') % 24
+    // MetricWizard stores days as 3-letter abbreviations: 'Mon', 'Tue', etc.
+    const currentDay = parts.find(p => p.type === 'weekday')?.value?.slice(0, 3) || ''
 
     // Parse send_time (stored as "HH:MM" or "HH:MM:SS")
     const sendHour = parseInt((metric.send_time || '08:00').split(':')[0])
