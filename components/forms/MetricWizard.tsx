@@ -7,13 +7,42 @@ import { LineChart, Line, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContai
 
 const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
+interface InitialData {
+  name: string
+  prompt_text: string
+  unit_label: string
+  response_type: 'number' | 'yesno'
+  start_date: string
+  end_date: string
+  recurrence_value: number
+  recurrence_unit: 'days' | 'weeks' | 'months'
+  send_days: string[] | null
+  has_goal: boolean
+  goal_start: number | null
+  goal_end: number | null
+  goal_direction: 'meet_or_exceed' | 'meet_or_below' | null
+  send_time: string
+  delivery_method: 'sms' | 'email'
+  graph_min: number | null
+  graph_max: number | null
+}
+
 interface MetricWizardProps {
   clientId: string
   clientPreferredContact: string
   clientTimezone: string
+  metricId?: string
+  initialData?: InitialData
 }
 
-export default function MetricWizard({ clientId, clientPreferredContact, clientTimezone }: MetricWizardProps) {
+export default function MetricWizard({
+  clientId,
+  clientPreferredContact,
+  clientTimezone,
+  metricId,
+  initialData,
+}: MetricWizardProps) {
+  const isEdit = !!metricId
   const router = useRouter()
   const supabase = createClient()
   const [step, setStep] = useState(1)
@@ -21,32 +50,37 @@ export default function MetricWizard({ clientId, clientPreferredContact, clientT
   const [error, setError] = useState('')
 
   // Step 1
-  const [name, setName] = useState('')
-  const [promptText, setPromptText] = useState('')
-  const [unitLabel, setUnitLabel] = useState('Times per day')
-  const [responseType, setResponseType] = useState<'number' | 'yesno'>('number')
+  const [name, setName] = useState(initialData?.name ?? '')
+  const [promptText, setPromptText] = useState(initialData?.prompt_text ?? '')
+  const [unitLabel, setUnitLabel] = useState(initialData?.unit_label ?? 'Times per day')
+  const [responseType, setResponseType] = useState<'number' | 'yesno'>(initialData?.response_type ?? 'number')
 
   // Step 2
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [recurrenceValue, setRecurrenceValue] = useState(1)
-  const [recurrenceUnit, setRecurrenceUnit] = useState<'days' | 'weeks' | 'months'>('days')
-  const [sendDays, setSendDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
-  const [endDateAuto, setEndDateAuto] = useState(true)
-  const [endDate, setEndDate] = useState(format(addDays(new Date(), 28), 'yyyy-MM-dd'))
+  const [startDate, setStartDate] = useState(initialData?.start_date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [recurrenceValue, setRecurrenceValue] = useState(initialData?.recurrence_value ?? 1)
+  const [recurrenceUnit, setRecurrenceUnit] = useState<'days' | 'weeks' | 'months'>(initialData?.recurrence_unit ?? 'days')
+  const [sendDays, setSendDays] = useState<string[]>(initialData?.send_days ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+  // In edit mode always show the actual date — can't know if it was auto-calculated originally
+  const [endDateAuto, setEndDateAuto] = useState(isEdit ? false : true)
+  const [endDate, setEndDate] = useState(initialData?.end_date ?? format(addDays(new Date(), 28), 'yyyy-MM-dd'))
 
   // Step 3
-  const [hasGoal, setHasGoal] = useState(false)
-  const [goalStart, setGoalStart] = useState('')
-  const [goalEnd, setGoalEnd] = useState('')
-  const [goalDirection, setGoalDirection] = useState<'meet_or_exceed' | 'meet_or_below'>('meet_or_exceed')
+  const [hasGoal, setHasGoal] = useState(initialData?.has_goal ?? false)
+  const [goalStart, setGoalStart] = useState(initialData?.goal_start?.toString() ?? '')
+  const [goalEnd, setGoalEnd] = useState(initialData?.goal_end?.toString() ?? '')
+  const [goalDirection, setGoalDirection] = useState<'meet_or_exceed' | 'meet_or_below'>(
+    initialData?.goal_direction ?? 'meet_or_exceed'
+  )
 
   // Step 4
-  const [sendTime, setSendTime] = useState('08:00')
-  const [deliveryMethod, setDeliveryMethod] = useState(clientPreferredContact as 'sms' | 'email')
+  const [sendTime, setSendTime] = useState(initialData?.send_time ?? '08:00')
+  const [deliveryMethod, setDeliveryMethod] = useState<'sms' | 'email'>(
+    (initialData?.delivery_method ?? clientPreferredContact) as 'sms' | 'email'
+  )
 
   // Step 5
-  const [graphMin, setGraphMin] = useState('')
-  const [graphMax, setGraphMax] = useState('')
+  const [graphMin, setGraphMin] = useState(initialData?.graph_min?.toString() ?? '')
+  const [graphMax, setGraphMax] = useState(initialData?.graph_max?.toString() ?? '')
 
   function calcEndDate() {
     const start = new Date(startDate)
@@ -62,14 +96,10 @@ export default function MetricWizard({ clientId, clientPreferredContact, clientT
   async function handleSave() {
     setSaving(true)
     setError('')
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Not signed in.'); setSaving(false); return }
 
     const finalEndDate = endDateAuto ? calcEndDate() : endDate
 
-    const { data, error: err } = await supabase.from('practice_metrics').insert({
-      client_id: clientId,
-      coach_id: user.id,
+    const payload = {
       name,
       prompt_text: promptText,
       unit_label: responseType === 'yesno' ? 'Yes or No' : unitLabel,
@@ -87,10 +117,26 @@ export default function MetricWizard({ clientId, clientPreferredContact, clientT
       goal_direction: hasGoal ? goalDirection : null,
       graph_min: graphMin ? parseFloat(graphMin) : null,
       graph_max: graphMax ? parseFloat(graphMax) : null,
-      is_active: true,
-    }).select().single()
+    }
 
-    if (err) { setError(err.message); setSaving(false); return }
+    if (isEdit) {
+      const { error: err } = await supabase
+        .from('practice_metrics')
+        .update(payload)
+        .eq('id', metricId!)
+      if (err) { setError(err.message); setSaving(false); return }
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('Not signed in.'); setSaving(false); return }
+      const { error: err } = await supabase.from('practice_metrics').insert({
+        ...payload,
+        client_id: clientId,
+        coach_id: user.id,
+        is_active: true,
+      })
+      if (err) { setError(err.message); setSaving(false); return }
+    }
+
     router.push(`/clients/${clientId}`)
     router.refresh()
   }
@@ -353,7 +399,9 @@ export default function MetricWizard({ clientId, clientPreferredContact, clientT
               disabled={saving}
               className="px-5 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-60"
               style={{ background: 'var(--blue)' }}>
-              {saving ? 'Activating...' : 'Activate This Metric'}
+              {saving
+                ? (isEdit ? 'Saving...' : 'Activating...')
+                : (isEdit ? 'Save Changes' : 'Activate This Metric')}
             </button>
           )}
         </div>

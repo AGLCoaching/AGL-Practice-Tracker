@@ -46,6 +46,9 @@ export default function MetricCard({ metric, clientId, dashboardUrl }: MetricCar
         </div>
         <div className="flex items-center gap-3">
           <CopyLinkButton url={dashboardUrl} label="Copy Client Link" />
+          <Link href={`/metrics/${metric.id}/edit`} className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+            Edit
+          </Link>
           <Link href={`/metrics/${metric.id}`} className="text-xs font-medium" style={{ color: 'var(--blue)' }}>
             Details →
           </Link>
