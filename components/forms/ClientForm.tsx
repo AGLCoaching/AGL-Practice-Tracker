@@ -44,6 +44,13 @@ export default function ClientForm({ initialData }: ClientFormProps) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  function maskPhone(value: string): string {
+    const digits = value.replace(/\D/g, '').slice(0, 10)
+    if (digits.length <= 3) return digits
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -95,7 +102,14 @@ export default function ClientForm({ initialData }: ClientFormProps) {
         <input type="email" value={form.email} onChange={e => set('email', e.target.value)} required className={inputCls} />
       </Field>
       <Field label="Cell Phone" hint="Required for SMS reminders">
-        <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} className={inputCls} placeholder="+1 555 000 0000" />
+        <input
+          type="tel"
+          value={form.phone}
+          onChange={e => set('phone', maskPhone(e.target.value))}
+          className={inputCls}
+          placeholder="(555) 000-0000"
+          maxLength={14}
+        />
       </Field>
       <Field label="Time Zone" required>
         <select value={form.timezone} onChange={e => set('timezone', e.target.value)} required className={inputCls}>
