@@ -1,10 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import ClientDashboardContent from '@/components/ClientDashboardContent'
 
 export default async function ClientDashboardPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const supabase = await createClient()
+  // Use service role so unauthenticated clients can access their dashboard via token
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 
   const { data: client } = await supabase
     .from('clients')
