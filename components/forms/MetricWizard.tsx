@@ -144,8 +144,7 @@ export default function MetricWizard({ clientId, clientPreferredContact, clientT
             </Field>
             <Field label="Response Type">
               <div className="flex gap-4 mt-1">
-                {[['number', 'Number (e.g. 3, 5, 10)'], ['yesno', 'Yes / No']] as const}
-                  {([['number', 'Number (e.g. 3, 5, 10)'], ['yesno', 'Yes / No']] as [string, string][]).map(([val, label]) => (
+                {([['number', 'Number (e.g. 3, 5, 10)'], ['yesno', 'Yes / No']] as [string, string][]).map(([val, label]) => (
                   <label key={val} className="flex items-center gap-2 cursor-pointer text-sm">
                     <input type="radio" name="responseType" value={val} checked={responseType === val}
                       onChange={() => setResponseType(val as 'number' | 'yesno')} />
