@@ -41,13 +41,13 @@ export async function POST(req: Request) {
 
   const { data: allClients } = await admin
     .from('clients')
-    .select('id, first_name, phone')
+    .select('id, first_name, phone, dashboard_token')
     .not('phone', 'is', null)
 
   const client = (allClients || []).find(c => {
     const stored = normalizePhone(c.phone || '')
     return stored === fromDigits
-  })
+  }) as { id: string; first_name: string; phone: string; dashboard_token: string } | undefined
 
   if (!client) {
     return twiml('We could not find your account. Please contact your coach.')
@@ -118,5 +118,6 @@ export async function POST(req: Request) {
     .update({ response_received: true })
     .eq('id', recentJob.id)
 
-  return twiml(`Got it, ${client.first_name}! Logged ${value}. Keep it up!`)
+  const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/c/${client.dashboard_token}`
+  return twiml(`Got it, ${client.first_name}! Logged ${value}. Keep it up!\n\nView your progress: ${dashboardUrl}`)
 }

@@ -61,7 +61,7 @@ export async function GET(req: Request) {
     .from('practice_metrics')
     .select(`
       id, name, prompt_text, send_time, send_days, client_id,
-      client:clients!inner(id, first_name, phone, timezone)
+      client:clients!inner(id, first_name, phone, timezone, dashboard_token)
     `)
     .eq('is_active', true)
     .eq('delivery_method', 'sms')
@@ -76,6 +76,7 @@ export async function GET(req: Request) {
       first_name: string
       phone: string | null
       timezone: string
+      dashboard_token: string
     }
 
     if (!client?.phone) {
@@ -130,7 +131,8 @@ export async function GET(req: Request) {
     }
 
     // All checks passed — send it
-    const message = `${metric.prompt_text} Reply with a number.`
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/c/${client.dashboard_token}`
+    const message = `${metric.prompt_text} Reply with a number.\n\nView your progress: ${dashboardUrl}`
     const toPhone = normalizePhone(client.phone)
 
     const { ok, error: smsError } = await sendSms(toPhone, message)
