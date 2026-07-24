@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import nodemailer from 'nodemailer'
 
-// Runs every hour via Vercel Cron (see vercel.json)
-// Checks for practice_metrics due this hour and sends SMS via Twilio
+// Runs every hour via Vercel Cron + cron-job.org
+// Checks for practice_metrics due this hour and sends SMS or email
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+// ── SMS ─────────────────────────────────────────────────────────────────────
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '')
@@ -36,6 +39,72 @@ async function sendSms(to: string, body: string): Promise<{ ok: boolean; error?:
   return { ok: false, error: text }
 }
 
+// ── Email ────────────────────────────────────────────────────────────────────
+
+function getMailTransporter() {
+  return nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.EMAIL_PORT || '587'),
+    secure: false, // STARTTLS
+    auth: {
+      user: process.env.EMAIL_USER!,
+      pass: process.env.EMAIL_PASS!,
+    },
+  })
+}
+
+async function sendEmail(
+  to: string,
+  subject: string,
+  text: string,
+  html: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const transporter = getMailTransporter()
+    await transporter.sendMail({
+      from: `"${process.env.EMAIL_FROM_NAME || 'AGL Habit Builder'}" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      text,
+      html,
+    })
+    return { ok: true }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function buildEmailHtml(
+  firstName: string,
+  promptText: string,
+  metricName: string,
+  dashboardUrl: string
+): string {
+  return `
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #404040;">
+  <img src="${process.env.NEXT_PUBLIC_SITE_URL}/agl-logo.png" alt="AGL Coaching" style="width: 120px; margin-bottom: 24px;" />
+  <h2 style="color: #1F3864; margin-bottom: 8px;">Hi ${firstName},</h2>
+  <p style="font-size: 16px; line-height: 1.5; margin-bottom: 24px;">${promptText}</p>
+  <a href="${dashboardUrl}"
+     style="display: inline-block; background: #2E75B6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600;">
+    Log My Progress
+  </a>
+  <p style="margin-top: 24px; font-size: 13px; color: #6B7280;">
+    You can also view your full progress history at:<br/>
+    <a href="${dashboardUrl}" style="color: #2E75B6;">${dashboardUrl}</a>
+  </p>
+  <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
+  <p style="font-size: 12px; color: #9CA3AF;">
+    This reminder is from your AGL coach for the practice: <strong>${metricName}</strong>
+  </p>
+</body>
+</html>`
+}
+
+// ── Main cron handler ────────────────────────────────────────────────────────
+
 export async function GET(req: Request) {
   // Verify secret — accepts Authorization header (Vercel cron) or ?secret= param (external cron)
   const authHeader = req.headers.get('authorization')
@@ -56,15 +125,15 @@ export async function GET(req: Request) {
   const skipped: string[] = []
   const errors: string[] = []
 
-  // Fetch all active SMS metrics with their client
+  // Fetch ALL active metrics (SMS and email) with their client
   const { data: metrics, error: metricsError } = await admin
     .from('practice_metrics')
     .select(`
-      id, name, prompt_text, send_time, send_days, client_id,
-      client:clients!inner(id, first_name, phone, timezone, dashboard_token)
+      id, name, prompt_text, send_time, send_days, delivery_method, client_id,
+      client:clients!inner(id, first_name, email, phone, timezone, dashboard_token)
     `)
     .eq('is_active', true)
-    .eq('delivery_method', 'sms')
+    .in('delivery_method', ['sms', 'email'])
 
   if (metricsError) {
     return NextResponse.json({ error: metricsError.message }, { status: 500 })
@@ -74,14 +143,10 @@ export async function GET(req: Request) {
     const client = metric.client as {
       id: string
       first_name: string
+      email: string
       phone: string | null
       timezone: string
       dashboard_token: string
-    }
-
-    if (!client?.phone) {
-      skipped.push(`${metric.id} — no phone`)
-      continue
     }
 
     // Get current time in client's timezone
@@ -112,7 +177,7 @@ export async function GET(req: Request) {
       }
     }
 
-    // Check if already sent today for this metric (in client's timezone)
+    // Check if already sent today
     const todayStr = new Intl.DateTimeFormat('en-CA', {
       timeZone: client.timezone || 'America/New_York',
     }).format(now) // YYYY-MM-DD
@@ -130,14 +195,26 @@ export async function GET(req: Request) {
       continue
     }
 
-    // All checks passed — send it
+    // All checks passed — send via the appropriate channel
     const dashboardUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/c/${client.dashboard_token}`
-    const message = `${metric.prompt_text} Reply with a number.\n\nView your progress: ${dashboardUrl}`
-    const toPhone = normalizePhone(client.phone)
+    let result: { ok: boolean; error?: string }
 
-    const { ok, error: smsError } = await sendSms(toPhone, message)
+    if (metric.delivery_method === 'sms') {
+      if (!client.phone) {
+        skipped.push(`${metric.id} — no phone for SMS`)
+        continue
+      }
+      const smsBody = `${metric.prompt_text} Reply with a number.\n\nView your progress: ${dashboardUrl}`
+      result = await sendSms(normalizePhone(client.phone), smsBody)
+    } else {
+      // email
+      const subject = `Practice reminder: ${metric.name}`
+      const text = `Hi ${client.first_name},\n\n${metric.prompt_text}\n\nLog your progress here: ${dashboardUrl}`
+      const html = buildEmailHtml(client.first_name, metric.prompt_text, metric.name, dashboardUrl)
+      result = await sendEmail(client.email, subject, text, html)
+    }
 
-    if (ok) {
+    if (result.ok) {
       await admin.from('reminder_jobs').insert({
         metric_id: metric.id,
         scheduled_for: now.toISOString(),
@@ -145,7 +222,7 @@ export async function GET(req: Request) {
         status: 'sent',
         response_received: false,
       })
-      sent.push(`${metric.id} → ${toPhone}`)
+      sent.push(`${metric.id} → ${metric.delivery_method} → ${metric.delivery_method === 'sms' ? client.phone : client.email}`)
     } else {
       await admin.from('reminder_jobs').insert({
         metric_id: metric.id,
@@ -153,7 +230,7 @@ export async function GET(req: Request) {
         status: 'failed',
         response_received: false,
       })
-      errors.push(`${metric.id} — ${smsError}`)
+      errors.push(`${metric.id} — ${result.error}`)
     }
   }
 
